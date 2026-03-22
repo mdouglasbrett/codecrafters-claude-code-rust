@@ -27,27 +27,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_api_key(api_key);
 
     let client = Client::with_config(config);
-
     #[allow(unused_variables)]
     let response: Value = client
         .chat()
         .create_byot(json!({
-            "messages": [
-                {
-                    "role": "user",
-                    "content": args.prompt
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": args.prompt
+                        }
+                    ],
+                    "model": "anthropic/claude-haiku-4.5",
+                    "tools": [
+                        {
+          "type": "function",
+          "function": {
+            "name": "Read",
+            "description": "Read and return the contents of a file",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "file_path": {
+                  "type": "string",
+                  "description": "The path to the file to read"
                 }
-            ],
-            "model": "anthropic/claude-haiku-4.5",
-        }))
+              },
+              "required": ["file_path"]
+            }
+          }
+        }
+                    ]
+                }))
         .await?;
 
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     eprintln!("Logs from your program will appear here!");
 
-     if let Some(content) = response["choices"][0]["message"]["content"].as_str() {
-         println!("{}", content);
-     }
+    if let Some(content) = response["choices"][0]["message"]["content"].as_str() {
+        println!("{}", content);
+    }
 
     Ok(())
 }
