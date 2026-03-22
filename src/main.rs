@@ -1,6 +1,6 @@
 use async_openai::{Client, config::OpenAIConfig};
 use clap::Parser;
-use serde_json::{Value, json};
+use serde_json::{Value, Value::Array, json};
 use std::{env, process};
 
 #[derive(Parser)]
@@ -63,8 +63,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     eprintln!("Logs from your program will appear here!");
 
-    if let Some(content) = response["choices"][0]["message"]["content"].as_str() {
-        println!("{}", content);
+    if let Value::Array(tool_calls) = &response["choices"][0]["message"]["tool_calls"] {
+        if !tool_calls.is_empty() {
+            for tool in tool_calls {
+                if tool["function"]["name"] == "Read" {
+                    if let Some(args) = tool["function"]["arguments"].as_str() {
+                        let args: Value = serde_json::from_str(args)?;
+                        // TODO: essentially, I am going to use io to read the
+                        // file contents from args.file_path and print to std_out
+                        // This should prolly all be cleaned up/typed before submission
+                        // Struct for args, clippy lints fixed etc, etc
+                        todo!()
+                    }
+                }
+            }
+        } else {
+            if let Some(content) = response["choices"][0]["message"]["content"].as_str() {
+                println!("{}", content);
+            }
+        }
     }
 
     Ok(())
