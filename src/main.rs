@@ -1,5 +1,6 @@
 use async_openai::{Client, config::OpenAIConfig};
 use clap::Parser;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, Value::Array, json};
 use std::{env, process};
 
@@ -8,6 +9,38 @@ use std::{env, process};
 struct Args {
     #[arg(short = 'p', long)]
     prompt: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ToolFunction {
+    name: String,
+    arguments: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ToolCall {
+    id: String,
+    r#type: String,
+    function: ToolFunction,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Message {
+    role: String,
+    content: Option<String>,
+    tool_calls: Vec<ToolCall>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Choice {
+    index: usize,
+    message: Message,
+    finish_reason: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Response {
+    choices: Vec<Choice>,
 }
 
 #[tokio::main]
@@ -28,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = Client::with_config(config);
     #[allow(unused_variables)]
-    let response: Value = client
+    let response: Response = client
         .chat()
         .create_byot(json!({
                     "messages": [
@@ -62,27 +95,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     eprintln!("Logs from your program will appear here!");
+    eprintln!("{:?}", response);
 
-    if let Value::Array(tool_calls) = &response["choices"][0]["message"]["tool_calls"] {
-        if !tool_calls.is_empty() {
-            for tool in tool_calls {
-                if tool["function"]["name"] == "Read" {
-                    if let Some(args) = tool["function"]["arguments"].as_str() {
-                        let args: Value = serde_json::from_str(args)?;
-                        // TODO: essentially, I am going to use io to read the
-                        // file contents from args.file_path and print to std_out
-                        // This should prolly all be cleaned up/typed before submission
-                        // Struct for args, clippy lints fixed etc, etc
-                        todo!()
-                    }
-                }
-            }
-        } else {
-            if let Some(content) = response["choices"][0]["message"]["content"].as_str() {
-                println!("{}", content);
-            }
-        }
-    }
+    //if let Array(tool_calls) = &response["choices"][0]["message"]["tool_calls"] {
+    //    if !tool_calls.is_empty() {
+    //        for tool in tool_calls {
+    //            if tool["function"]["name"] == "Read"
+    //                && let Some(args) = tool["function"]["arguments"].as_str()
+    //            {
+    //                let args: Value = serde_json::from_str(args)?;
+    //                eprintln!("{:?}", args["file_path"]);
+    //                // TODO: essentially, I am going to use io to read the
+    //                // file contents from args.file_path and print to std_out
+    //                // This should prolly all be cleaned up/typed before submission
+    //                // Struct for args, clippy lints fixed etc, etc
+    //                todo!()
+    //            }
+    //        }
+    //    } else {
+    //        if let Some(content) = response["choices"][0]["message"]["content"].as_str() {
+    //            println!("{}", content);
+    //        }
+    //    }
+    //}
 
     Ok(())
 }
