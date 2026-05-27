@@ -1,8 +1,8 @@
 use async_openai::{Client, config::OpenAIConfig};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, Value::Array, json};
-use std::{env, process};
+use serde_json::{from_str, json};
+use std::{env, fs::File, io::read_to_string, path::PathBuf, process};
 
 #[derive(Parser)]
 #[command(author, version, about)]
@@ -12,8 +12,28 @@ struct Args {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+enum FunctionName {
+    Read,
+    Unknown,
+}
+
+impl From<&str> for FunctionName {
+    fn from(s: &str) -> Self {
+        match s {
+            "Read" => Self::Read,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ReadArgs {
+    file_path: PathBuf,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 struct ToolFunction {
-    name: String,
+    name: FunctionName,
     arguments: String,
 }
 
@@ -60,7 +80,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_api_key(api_key);
 
     let client = Client::with_config(config);
-    #[allow(unused_variables)]
     let response: Response = client
         .chat()
         .create_byot(json!({
@@ -93,31 +112,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }))
         .await?;
 
-    // You can use print statements as follows for debugging, they'll be visible when running tests.
-    eprintln!("Logs from your program will appear here!");
-    eprintln!("{:?}", response);
-
-    //if let Array(tool_calls) = &response["choices"][0]["message"]["tool_calls"] {
-    //    if !tool_calls.is_empty() {
-    //        for tool in tool_calls {
-    //            if tool["function"]["name"] == "Read"
-    //                && let Some(args) = tool["function"]["arguments"].as_str()
-    //            {
-    //                let args: Value = serde_json::from_str(args)?;
-    //                eprintln!("{:?}", args["file_path"]);
-    //                // TODO: essentially, I am going to use io to read the
-    //                // file contents from args.file_path and print to std_out
-    //                // This should prolly all be cleaned up/typed before submission
-    //                // Struct for args, clippy lints fixed etc, etc
-    //                todo!()
-    //            }
-    //        }
-    //    } else {
-    //        if let Some(content) = response["choices"][0]["message"]["content"].as_str() {
-    //            println!("{}", content);
-    //        }
-    //    }
-    //}
+    if !response.choices.is_empty()
+        && let Some(choice) = response.choices.first()
+    {
+        let tool_calls = &choice.message.tool_calls;
+        for tool_call in tool_calls {
+            match tool_call.function.name {
+                FunctionName::Read => {
+                    eprintln!("{:?}", &tool_call.function.arguments);
+                    if let Ok(read_args) = from_str::<ReadArgs>(&tool_call.function.arguments) {
+                        if let Ok(file) = File::open(&read_args.file_path) {
+                            println!("{}", read_to_string(file)?);
+                        }
+                    }
+                }
+                _ => {
+                    continue;
+                }
+            }
+        }
+    }
 
     Ok(())
 }
