@@ -119,12 +119,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         for tool_call in tool_calls {
             match tool_call.function.name {
                 FunctionName::Read => {
-                    eprintln!("{:?}", &tool_call.function.arguments);
-                    if let Ok(read_args) = from_str::<ReadArgs>(&tool_call.function.arguments) {
-                        if let Ok(file) = File::open(&read_args.file_path) {
+                    if let Ok(read_args) = from_str::<ReadArgs>(&tool_call.function.arguments)
+                        && let Ok(file) = File::open(&read_args.file_path) {
                             println!("{}", read_to_string(file)?);
                         }
-                    }
                 }
                 _ => {
                     continue;
