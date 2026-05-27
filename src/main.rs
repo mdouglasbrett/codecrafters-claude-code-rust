@@ -48,7 +48,7 @@ struct ToolCall {
 struct Message {
     role: String,
     content: Option<String>,
-    tool_calls: Vec<ToolCall>,
+    tool_calls: Option<Vec<ToolCall>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -115,19 +115,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !response.choices.is_empty()
         && let Some(choice) = response.choices.first()
     {
-        let tool_calls = &choice.message.tool_calls;
-        for tool_call in tool_calls {
-            match tool_call.function.name {
-                FunctionName::Read => {
-                    if let Ok(read_args) = from_str::<ReadArgs>(&tool_call.function.arguments)
-                        && let Ok(file) = File::open(&read_args.file_path) {
+        if let Some(tool_calls) = &choice.message.tool_calls {
+            for tool_call in tool_calls {
+                match tool_call.function.name {
+                    FunctionName::Read => {
+                        if let Ok(read_args) = from_str::<ReadArgs>(&tool_call.function.arguments)
+                            && let Ok(file) = File::open(&read_args.file_path)
+                        {
                             println!("{}", read_to_string(file)?);
                         }
-                }
-                _ => {
-                    continue;
+                    }
+                    _ => {
+                        continue;
+                    }
                 }
             }
+        } else if let Some(content) = &choice.message.content {
+            println!("{}", content);
         }
     }
 
