@@ -2,7 +2,7 @@ use async_openai::{Client, config::OpenAIConfig};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json};
-use std::{env, fs::File, io::read_to_string, path::PathBuf, process};
+use std::{collections::VecDeque, env, fs::File, io::read_to_string, path::PathBuf, process};
 
 #[derive(Parser)]
 #[command(author, version, about)]
@@ -63,10 +63,7 @@ struct Response {
     choices: Vec<Choice>,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
-
+async fn call_api(message: Message) -> Option<Response> {
     let base_url = env::var("OPENROUTER_BASE_URL")
         .unwrap_or_else(|_| "https://openrouter.ai/api/v1".to_string());
 
@@ -74,20 +71,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("OPENROUTER_API_KEY is not set");
         process::exit(1);
     });
-
     let config = OpenAIConfig::new()
         .with_api_base(base_url)
         .with_api_key(api_key);
-
     let client = Client::with_config(config);
-    let response: Response = client
+
+    let response = client
         .chat()
         .create_byot(json!({
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": args.prompt
-                        }
+                    "messages": [message
                     ],
                     "model": "anthropic/claude-haiku-4.5",
                     "tools": [
@@ -110,29 +102,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
                     ]
                 }))
-        .await?;
+        .await;
 
-    if !response.choices.is_empty()
-        && let Some(choice) = response.choices.first()
-    {
-        if let Some(tool_calls) = &choice.message.tool_calls {
-            for tool_call in tool_calls {
-                match tool_call.function.name {
-                    FunctionName::Read => {
-                        if let Ok(read_args) = from_str::<ReadArgs>(&tool_call.function.arguments)
-                            && let Ok(file) = File::open(&read_args.file_path)
-                        {
-                            println!("{}", read_to_string(file)?);
+    if response.is_err() {
+        return None;
+    }
+
+    // TODO: do I want to panic?
+    Some(response.expect("Something went wrong!"))
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+
+    let mut messages: VecDeque<Message> = VecDeque::new();
+    // TODO: impl Default and add a new()
+    messages.push_back(Message {
+        role: "user".to_string(),
+        content: Some(args.prompt.to_string()),
+        tool_calls: None,
+    });
+
+    while let Some(message) = messages.pop_front() {
+        if let Some(response) = call_api(message).await
+            && !response.choices.is_empty()
+                && let Some(choice) = response.choices.first()
+            {
+                if let Some(tool_calls) = &choice.message.tool_calls {
+                    for tool_call in tool_calls {
+                        match tool_call.function.name {
+                            FunctionName::Read => {
+                                if let Ok(read_args) =
+                                    from_str::<ReadArgs>(&tool_call.function.arguments)
+                                    && let Ok(file) = File::open(&read_args.file_path)
+                                {
+                                    println!("{}", read_to_string(file)?);
+                                }
+                            }
+                            _ => {
+                                continue;
+                            }
                         }
                     }
-                    _ => {
-                        continue;
-                    }
+                } else if let Some(content) = &choice.message.content {
+                    println!("{}", content);
                 }
             }
-        } else if let Some(content) = &choice.message.content {
-            println!("{}", content);
-        }
     }
 
     Ok(())
