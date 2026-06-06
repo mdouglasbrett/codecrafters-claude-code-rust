@@ -1,3 +1,4 @@
+#![warn(clippy::style, clippy::complexity, clippy::perf, clippy::correctness)]
 use async_openai::{Client, config::OpenAIConfig};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
