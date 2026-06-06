@@ -15,6 +15,7 @@ struct Args {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum FunctionName {
     Read,
+    Write,
     Unknown,
 }
 
@@ -22,6 +23,7 @@ impl From<&str> for FunctionName {
     fn from(s: &str) -> Self {
         match s {
             "Read" => Self::Read,
+            "Write" => Self::Write,
             _ => Self::Unknown,
         }
     }
@@ -30,6 +32,12 @@ impl From<&str> for FunctionName {
 #[derive(Serialize, Deserialize, Debug)]
 struct ReadArgs {
     file_path: PathBuf,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct WriteArgs {
+    file_path: PathBuf,
+    content: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -125,28 +133,49 @@ async fn call_api(messages: &[Message]) -> Option<Response> {
     let response = client
         .chat()
         .create_byot(json!({
-                    "messages": messages,
-                    "model": "anthropic/claude-haiku-4.5",
-                    "tools": [
-                        {
-          "type": "function",
-          "function": {
-            "name": "Read",
-            "description": "Read and return the contents of a file",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "file_path": {
-                  "type": "string",
-                  "description": "The path to the file to read"
+            "messages": messages,
+            "model": "anthropic/claude-haiku-4.5",
+            "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "Read",
+                    "description": "Read and return the contents of a file",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "The path to the file to read"
+                            }
+                        },
+                        "required": ["file_path"]
+                    }
                 }
-              },
-              "required": ["file_path"]
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "Write",
+                    "description": "Write content to a file",
+                    "parameters": {
+                        "type": "object",
+                        "required": ["file_path", "content"],
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "The path of the file to write to"
+                            },
+                            "content": {
+                                "type": "string",
+                                "description": "The content to write to the file"
+                            }
+                        }
+                    }
+                }
             }
-          }
-        }
-                    ]
-                }))
+            ]
+        }))
         .await;
 
     if response.is_err() {
@@ -188,6 +217,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 if let Some(tool_calls) = &choice.message.tool_calls {
                     for tool_call in tool_calls {
+                        // TODO: extract an args function
                         match tool_call.function.name {
                             FunctionName::Read => {
                                 if let Ok(read_args) =
@@ -202,7 +232,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     messages.push(tool_message);
                                 }
                             }
-                            _ => {
+                            FunctionName::Write => {
+                                if let Ok(_write_args) =
+                                    from_str::<WriteArgs>(&tool_call.function.arguments)
+                                {
+                                    todo!();
+                                }
+                            }
+                            FunctionName::Unknown => {
                                 continue;
                             }
                         }
