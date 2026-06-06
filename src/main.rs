@@ -44,13 +44,57 @@ struct ToolCall {
     function: ToolFunction,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 struct Message {
     role: String,
     content: Option<String>,
     // TODO: this is the only thing I am really calling clone on...
     tool_calls: Option<Vec<ToolCall>>,
     tool_call_id: Option<String>,
+}
+
+impl Message {
+    fn builder() -> MessageBuilder {
+        MessageBuilder::new()
+    }
+}
+
+#[derive(Debug, Default)]
+struct MessageBuilder {
+    role: Option<String>,
+    content: Option<String>,
+    tool_calls: Option<Vec<ToolCall>>,
+    tool_call_id: Option<String>,
+}
+
+impl MessageBuilder {
+    fn new() -> Self {
+        Self::default()
+    }
+    fn role(mut self, role: String) -> Self {
+        self.role = Some(role);
+        self
+    }
+    fn content(mut self, content: Option<String>) -> Self {
+        self.content = content;
+        self
+    }
+    fn tool_calls(mut self, tool_calls: Option<Vec<ToolCall>>) -> Self {
+        self.tool_calls = tool_calls;
+        self
+    }
+    fn tool_call_id(mut self, tool_call_id: Option<String>) -> Self {
+        self.tool_call_id = tool_call_id;
+        self
+    }
+    fn build(self) -> Message {
+        Message {
+            role: self.role.unwrap_or("user".to_string()),
+            content: self.content,
+            tool_calls: self.tool_calls,
+            tool_call_id: self.tool_call_id,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -115,13 +159,10 @@ async fn call_api(messages: &[Message]) -> Option<Response> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-
-    let mut messages: Vec<Message> = vec![Message {
-        role: "user".to_string(),
-        content: Some(args.prompt.to_string()),
-        tool_calls: None,
-        tool_call_id: None,
-    }];
+    let seed = Message::builder()
+        .content(Some(args.prompt.to_string()))
+        .build();
+    let mut messages: Vec<Message> = vec![seed];
 
     loop {
         if let Some(response) = call_api(messages.as_slice()).await
@@ -136,13 +177,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     return Ok(());
                 }
 
-                // TODO: could I have a message builder here...
-                messages.push(Message {
-                    role: choice.message.role,
-                    content: choice.message.content,
-                    tool_calls: choice.message.tool_calls.clone(),
-                    tool_call_id: choice.message.tool_call_id,
-                });
+                let resp_message = Message::builder()
+                    .role(choice.message.role)
+                    .content(choice.message.content)
+                    .tool_calls(choice.message.tool_calls.clone())
+                    .tool_call_id(choice.message.tool_call_id)
+                    .build();
+                messages.push(resp_message);
 
                 if let Some(tool_calls) = &choice.message.tool_calls {
                     for tool_call in tool_calls {
@@ -152,12 +193,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     from_str::<ReadArgs>(&tool_call.function.arguments)
                                     && let Ok(file) = File::open(&read_args.file_path)
                                 {
-                                    messages.push(Message {
-                                        role: "tool".to_string(),
-                                        content: Some(read_to_string(file)?),
-                                        tool_call_id: Some(tool_call.id.to_string()),
-                                        tool_calls: None,
-                                    });
+                                    let tool_message = Message::builder()
+                                        .role("tool".to_string())
+                                        .content(Some(read_to_string(file)?))
+                                        .tool_call_id(Some(tool_call.id.to_string()))
+                                        .build();
+                                    messages.push(tool_message);
                                 }
                             }
                             _ => {
