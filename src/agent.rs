@@ -4,7 +4,7 @@ use std::{error::Error, fs::File, io::read_to_string};
 
 pub enum AgentState {
     Working,
-    Finished
+    Finished,
 }
 pub async fn agent(messages: &mut Vec<Message>) -> Result<AgentState, Box<dyn Error>> {
     if let Some(response) = call_api(messages.as_slice()).await

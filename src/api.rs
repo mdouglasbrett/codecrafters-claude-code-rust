@@ -1,9 +1,9 @@
 #![warn(clippy::style, clippy::complexity, clippy::perf, clippy::correctness)]
 
+use crate::{Message, Response};
 use async_openai::{Client, config::OpenAIConfig};
 use serde_json::json;
 use std::{env, process};
-use crate::{Message, Response};
 
 pub async fn call_api(messages: &[Message]) -> Option<Response> {
     let base_url = env::var("OPENROUTER_BASE_URL")

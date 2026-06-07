@@ -18,9 +18,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut messages: Vec<Message> = vec![seed];
 
     loop {
-        match agent(&mut messages).await? {
-            AgentState::Finished => break,
-            _ => {},
+        if let AgentState::Finished = agent(&mut messages).await? {
+            break;
         }
     }
     Ok(())
