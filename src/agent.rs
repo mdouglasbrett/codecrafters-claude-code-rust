@@ -18,6 +18,8 @@ pub async fn agent(messages: &mut Vec<Message>) -> Result<AgentState, Box<dyn Er
                 return Ok(AgentState::Finished);
             }
 
+            // TODO: I think I can get rid of this clone if I handle the tool calls first
+            // VecDeque and push_front for this item then append to messages?
             let resp_message = Message::builder()
                 .role(choice.message.role)
                 .content(choice.message.content)
