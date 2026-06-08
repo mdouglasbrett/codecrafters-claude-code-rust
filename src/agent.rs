@@ -4,6 +4,7 @@ use std::{
     error::Error,
     fs::File,
     io::{Write, read_to_string},
+    process::Command,
 };
 
 pub enum AgentState {
@@ -66,7 +67,11 @@ pub async fn agent(messages: &mut Vec<Message>) -> Result<AgentState, Box<dyn Er
                             if let Ok(bash_args) =
                                 get_args::<BashArgs>(&tool_call.function.arguments)
                             {
-                                todo!();
+                                let args = bash_args.command.split(" ").collect::<Vec<&str>>();
+                                if let Some((first, rest)) = args.split_first() {
+                                    let _command = Command::new(first).args(rest);
+                                    todo!();
+                                }
                             }
                         }
                         FunctionName::Unknown => {
