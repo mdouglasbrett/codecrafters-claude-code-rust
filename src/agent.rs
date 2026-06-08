@@ -1,6 +1,10 @@
 #![warn(clippy::style, clippy::complexity, clippy::perf, clippy::correctness)]
 use crate::{FunctionName, Message, ReadArgs, WriteArgs, call_api, get_args};
-use std::{error::Error, fs::File, io::read_to_string};
+use std::{
+    error::Error,
+    fs::File,
+    io::{Write, read_to_string},
+};
 
 pub enum AgentState {
     Working,
@@ -45,10 +49,17 @@ pub async fn agent(messages: &mut Vec<Message>) -> Result<AgentState, Box<dyn Er
                             }
                         }
                         FunctionName::Write => {
-                            if let Ok(_write_args) =
+                            if let Ok(write_args) =
                                 get_args::<WriteArgs>(&tool_call.function.arguments)
                             {
-                                todo!();
+                                let mut file = File::create(write_args.file_path)?;
+                                file.write_all(write_args.content.as_bytes())?;
+                                let tool_message = Message::builder()
+                                    .role("tool".to_string())
+                                    .content(Some("Created the file".to_string()))
+                                    .tool_call_id(Some(tool_call.id.to_string()))
+                                    .build();
+                                messages.push(tool_message);
                             }
                         }
                         FunctionName::Unknown => {
