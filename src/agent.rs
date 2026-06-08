@@ -1,5 +1,5 @@
 #![warn(clippy::style, clippy::complexity, clippy::perf, clippy::correctness)]
-use crate::{FunctionName, Message, ReadArgs, WriteArgs, call_api, get_args};
+use crate::{BashArgs, FunctionName, Message, ReadArgs, WriteArgs, call_api, get_args};
 use std::{
     error::Error,
     fs::File,
@@ -60,6 +60,13 @@ pub async fn agent(messages: &mut Vec<Message>) -> Result<AgentState, Box<dyn Er
                                     .tool_call_id(Some(tool_call.id.to_string()))
                                     .build();
                                 messages.push(tool_message);
+                            }
+                        }
+                        FunctionName::Bash => {
+                            if let Ok(bash_args) =
+                                get_args::<BashArgs>(&tool_call.function.arguments)
+                            {
+                                todo!();
                             }
                         }
                         FunctionName::Unknown => {

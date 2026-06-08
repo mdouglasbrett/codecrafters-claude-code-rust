@@ -1,15 +1,15 @@
 #![warn(clippy::style, clippy::complexity, clippy::perf, clippy::correctness)]
 
 use async_openai::{Client, config::OpenAIConfig};
-use serde_json::json;
 use serde::{Deserialize, Serialize};
-use std::{env, process, path::PathBuf};
-
+use serde_json::json;
+use std::{env, path::PathBuf, process};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum FunctionName {
     Read,
     Write,
+    Bash,
     Unknown,
 }
 
@@ -26,6 +26,11 @@ impl From<&str> for FunctionName {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ReadArgs {
     pub file_path: PathBuf,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BashArgs {
+    pub command: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -163,6 +168,23 @@ pub async fn call_api(messages: &[Message]) -> Option<Response> {
                             "content": {
                                 "type": "string",
                                 "description": "The content to write to the file"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "Bash",
+                    "description": "Execute a shell command",
+                    "parameters": {
+                        "type": "object",
+                        "required": ["command"],
+                        "properties": {
+                            "command": {
+                                "type": "string",
+                                "description": "The command to execute"
                             }
                         }
                     }

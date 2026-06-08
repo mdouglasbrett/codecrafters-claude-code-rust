@@ -15,6 +15,6 @@ where
 
 pub use {
     agent::{AgentState, agent},
-    api::{FunctionName, Message, ReadArgs, Response, WriteArgs,call_api},
+    api::{BashArgs, FunctionName, Message, ReadArgs, Response, WriteArgs, call_api},
     get_tool_call_args as get_args,
 };
